@@ -159,18 +159,21 @@ float Motor::effective_current_lim() {
     float current_lim = config_.current_lim;
     // Hardware limit
     if (axis_->motor_.config_.motor_type == Motor::MOTOR_TYPE_GIMBAL) {
+        //云台电机使用电压控制(云台电机转速低)
         current_lim = std::min(current_lim, 0.98f*one_by_sqrt3*vbus_voltage); //gimbal motor is voltage control
     } else {
+        //将两个电流限制量的最小值(航模电机用这个)
         current_lim = std::min(current_lim, axis_->motor_.current_control_.max_allowed_current);
     }
 
     // Apply axis current limiters
     for (const CurrentLimiter* const limiter : axis_->current_limiters_) {
+        //热敏电阻限流
         current_lim = std::min(current_lim, limiter->get_current_limit(config_.current_lim));
     }
 
     effective_current_lim_ = current_lim;
-
+    //各种因素的限流需同时满足
     return effective_current_lim_;
 }
 
@@ -440,20 +443,27 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
 // phase [rad electrical]
 // phase_vel [rad/s electrical]
 bool Motor::update(float torque_setpoint, float phase, float phase_vel) {
+    //电流期望值
     float current_setpoint = 0.0f;
+    //方向赋值
     phase *= config_.direction;
     phase_vel *= config_.direction;
 
+    //计算设置电流的大小和方向
     if (config_.motor_type == MOTOR_TYPE_ACIM) {
+        //感应电机
         current_setpoint = torque_setpoint / (config_.torque_constant * fmax(current_control_.acim_rotor_flux, config_.acim_gain_min_flux));
     }
     else {
+        //大电流电机或云台电机
         current_setpoint = torque_setpoint / config_.torque_constant;
     }
     current_setpoint *= config_.direction;
 
     // TODO: 2-norm vs independent clamping (current could be sqrt(2) bigger)
+    //电流限制
     float ilim = effective_current_lim();
+    //dq轴的设置电流限幅
     float id = std::clamp(current_control_.Id_setpoint, -ilim, ilim);
     float iq = std::clamp(current_setpoint, -ilim, ilim);
 
@@ -487,7 +497,7 @@ bool Motor::update(float torque_setpoint, float phase, float phase_vel) {
         phase += current_control_.async_phase_offset;
         phase = wrap_pm_pi(phase);
     }
-
+    //电流的设置值生效在1.5倍的PWM周期之后
     float pwm_phase = phase + 1.5f * current_meas_period * phase_vel;
 
     // Execute current command

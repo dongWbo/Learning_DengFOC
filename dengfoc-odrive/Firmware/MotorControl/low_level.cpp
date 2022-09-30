@@ -110,6 +110,7 @@ void safety_critical_arm_motor_pwm(Motor& motor) {
 // motor phases are floating and will not be enabled again until
 // safety_critical_arm_motor_phases is called.
 // @returns true if the motor was in a state other than disarmed before
+//关闭三项桥的输出，上下桥都关闭
 bool safety_critical_disarm_motor_pwm(Motor& motor) {
     uint32_t mask = cpu_enter_critical();
     bool was_armed = motor.armed_state_ != Motor::ARMED_STATE_DISARMED;

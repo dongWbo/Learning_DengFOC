@@ -128,7 +128,7 @@ void Encoder::c(int32_t count, bool update_offset) {
 
     if (update_offset) {
         config_.offset += count - count_in_cpr_;
-        config_.offset = mod(config_.offset, config_.cpr);  ////////////////////////////////////////////////////////////////////取余数
+        config_.offset = mod(config_.offset, config_.cpr);
     }
 
     // Update states
@@ -181,8 +181,10 @@ bool Encoder::run_direction_find() {
 // direction in order to find the offset between the electrical phase 0
 // and the encoder state 0.
 // TODO: Do the scan with current, not voltage!
+//我打算直接A正BC负给电，确定电机电器零位
 bool Encoder::run_offset_calibration() {
-    const float start_lock_duration = 1.0f;    //编码器校准开始，归位时间，单位s
+    //编码器校准开始，维持归位状态的时间，单位s
+    const float start_lock_duration = 1.0f;    
     //校准步数 = 校准距离 / 校准速度 * 校准频率;
     const int num_steps = (int)(config_.calib_scan_distance / config_.calib_scan_omega * (float)current_meas_hz);
 
@@ -362,6 +364,7 @@ bool Encoder::abs_spi_start_transaction(){
     return true;
 }
 
+//16位的偶校验
 uint8_t ams_parity(uint16_t v) {
     v ^= v >> 8;
     v ^= v >> 4;
@@ -376,18 +379,24 @@ uint8_t cui_parity(uint16_t v) {
     v ^= v >> 2;
     return ~v & 3;
 }
-///////////////////////////////////////////////////////////////////////////////////////////////////读取编码器原始数据
+
+//读取编码器原始数据
 void Encoder::abs_spi_cb(){
     HAL_GPIO_WritePin(abs_spi_cs_port_, abs_spi_cs_pin_, GPIO_PIN_SET);
 
     axis_->motor_.log_timing(TIMING_LOG_SPI_END);
 
+    //绝对值编码器记录到的绝对位置
     uint16_t pos;
 
     switch (mode_) {
-        case MODE_SPI_ABS_AMS: {////////////////////////////////////////////////////////////////////as5047P可用
+        case MODE_SPI_ABS_AMS: {
+            //as5047P可用
             uint16_t rawVal = abs_spi_dma_rx_[0];
+
+            //为什么这部分被注释掉了？ 和哪里有冲突吗？ 还是AMS的SPI ABS encoder 不会出问题？
             // check if parity is correct (even) and error flag clear
+            //检查奇偶校验位和EF位
             // if (ams_parity(rawVal) || ((rawVal >> 14) & 1)) {
             //     return;
             // }
@@ -413,8 +422,9 @@ void Encoder::abs_spi_cb(){
            return;
         } break;
     }
-
+    //记录数据，绝对位置
     pos_abs_ = pos;
+    //采集状态标志位更新为成功采集
     abs_spi_pos_updated_ = true;
     if (config_.pre_calibrated) {
         is_ready_ = true;
@@ -441,8 +451,11 @@ void Encoder::abs_spi_cs_pin_init(){
 
 bool Encoder::update() {
     // update internal encoder state.
+
+    //n与n-1次的编码器变化量
     int32_t delta_enc = 0;
-    int32_t pos_abs_latched = pos_abs_; //
+    //绝对值编码器读取到的绝对位置
+    int32_t pos_abs_latched = pos_abs_;
 
     switch (mode_) {
         case MODE_INCREMENTAL: {
@@ -477,25 +490,32 @@ bool Encoder::update() {
             if (delta_enc > 6283/2)
                 delta_enc -= 6283;
         } break;
-        ////////////////////////////////////////////////////////////////////////////////////////////适用于as5047P的编码器数据更新
         case MODE_SPI_ABS_RLS:
         case MODE_SPI_ABS_AMS:
         case MODE_SPI_ABS_CUI: 
         case MODE_SPI_ABS_AEAT: {
+            //适用于as5047P的编码器数据更新
             if (abs_spi_pos_updated_ == false) {
+                //abs_spi_pos_updated_编码器采样失误到一定程度时报错；SPI校验位错误时abs_spi_pos_updated_将不会更新，为false 
                 // Low pass filter the error
                 spi_error_rate_ += current_meas_period * (1.0f - spi_error_rate_);
                 if (spi_error_rate_ > 0.005f)
                     set_error(ERROR_ABS_SPI_COM_FAIL);
             } else {
+                //正常后清除误差计量位
                 // Low pass filter the error
                 spi_error_rate_ += current_meas_period * (0.0f - spi_error_rate_);
             }
 
             abs_spi_pos_updated_ = false;
-            delta_enc = pos_abs_latched - count_in_cpr_; //LATCH
-            delta_enc = mod(delta_enc, config_.cpr);     //取模运算
-            if (delta_enc > config_.cpr/2) {             //幅度限制在-0.5到0.5之间
+            
+            //计算编码器两次采样之间的绝对位置变化量(变化量大于cpr/2时方向会发生错误)
+            //这一次的绝对位置减去上一次的绝对位置
+            delta_enc = pos_abs_latched - count_in_cpr_;
+            //溢出 
+            delta_enc = mod(delta_enc, config_.cpr);
+            //反转
+            if (delta_enc > config_.cpr/2) {
                 delta_enc -= config_.cpr;
             }
 
@@ -506,18 +526,13 @@ bool Encoder::update() {
         } break;
     }
 
+
+    //记录位移
     shadow_count_ += delta_enc;
     count_in_cpr_ += delta_enc;
+
+    //记录绝对位置，同pos_abs_latched
     count_in_cpr_ = mod(count_in_cpr_, config_.cpr);
-
-    //pos_abs_latched  位置绝对值
-    //delta_enc        位置增量
-    //count_in_cpr_    计算后得出的位置绝对值
-    //shadow_count_    位移计数
-
-
-
-
 
     if(mode_ & MODE_FLAG_ABS)
         count_in_cpr_ = pos_abs_latched;
@@ -534,7 +549,7 @@ bool Encoder::update() {
     pos_estimate_counts_ += current_meas_period * pll_kp_ * delta_pos_counts;
     pos_cpr_counts_ += current_meas_period * pll_kp_ * delta_pos_cpr_counts;
     pos_cpr_counts_ = fmodf_pos(pos_cpr_counts_, (float)(config_.cpr));
-    vel_estimate_counts_ += current_meas_period * pll_ki_ * delta_pos_cpr_counts;
+    vel__counts_ += current_meas_period * pll_ki_ * delta_pos_cpr_counts;
     bool snap_to_zero_vel = false;
     if (std::abs(vel_estimate_counts_) < 0.5f * current_meas_period * pll_ki_) {
         vel_estimate_counts_ = 0.0f;  //align delta-sigma on zero to prevent jitter
@@ -575,6 +590,8 @@ bool Encoder::update() {
     float elec_rad_per_enc = axis_->motor_.config_.pole_pairs * 2 * M_PI * (1.0f / (float)(config_.cpr));
     float ph = elec_rad_per_enc * (interpolated_enc - config_.offset_float);
     // ph = fmodf(ph, 2*M_PI);
+
+    //电机使用的是这个值
     phase_ = wrap_pm_pi(ph);
 
     vel_estimate_valid_ = true;

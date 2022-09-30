@@ -311,7 +311,9 @@ bool Axis::run_sensorless_control_loop() {
     return check_for_errors();
 }
 
+//运行主体部分
 bool Axis::run_closed_loop_control_loop() {
+    //初始化部分
     if (!controller_.select_encoder(controller_.config_.load_encoder_axis)) {
         return error_ |= ERROR_CONTROLLER_FAILED, false;
     }
@@ -341,6 +343,8 @@ bool Axis::run_closed_loop_control_loop() {
     controller_.vel_integrator_torque_ = 0.0f;
 
     set_step_dir_active(config_.enable_step_dir);
+
+    //循环运行
     run_control_loop([this](){
         // Note that all estimators are updated in the loop prefix in run_control_loop
         float torque_setpoint;
@@ -467,13 +471,16 @@ bool Axis::run_idle_loop() {
 }
 
 // Infinite loop that does calibration and enters main control loop as appropriate
+//这应该是梦开始的地方了吧
 void Axis::run_state_machine_loop() {
 
     // arm!
+    //初始化
     motor_.arm();
 
     for (;;) {
         // Load the task chain if a specific request is pending
+        // 如果某个特定的请求挂起，则加载任务链
         if (requested_state_ != AXIS_STATE_UNDEFINED) {
             size_t pos = 0;
             if (requested_state_ == AXIS_STATE_STARTUP_SEQUENCE) {
@@ -566,6 +573,8 @@ void Axis::run_state_machine_loop() {
                 if (!encoder_.is_ready_)
                     goto invalid_state_label;
                 watchdog_feed();
+                
+                //运行主体部分
                 status = run_closed_loop_control_loop();
             } break;
 

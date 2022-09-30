@@ -197,7 +197,7 @@ enum TimingLog_t {
 };
 
 
-#include "autogen/interfaces.hpp"
+#//include "autogen/interfaces.hpp"
 
 // ODrive specific includes
 #include <utils.hpp>

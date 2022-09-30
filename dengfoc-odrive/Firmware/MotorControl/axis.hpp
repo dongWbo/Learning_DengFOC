@@ -161,16 +161,21 @@ public:
 
             // Run main loop function, defer quitting for after wait
             // TODO: change arming logic to arm after waiting
+            //主循环在这里
             bool main_continue = update_handler();
 
             // Check we meet deadlines after queueing
             ++loop_counter_;
 
             // Wait until the current measurement interrupt fires
+            //电流采样中断的触发条件是什么
             if (!wait_for_current_meas()) {
                 // maybe the interrupt handler is dead, let's be
                 // safe and float the phases
+                //关闭三项桥
                 safety_critical_disarm_motor_pwm(motor_);
+
+                //制动电阻部分，我不打算添加
                 update_brake_current();
                 error_ |= ERROR_CURRENT_MEASUREMENT_TIMEOUT;
                 break;

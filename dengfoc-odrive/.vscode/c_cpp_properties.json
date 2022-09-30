@@ -1,0 +1,26 @@
+{
+  "configurations": [
+    {
+      "name": "windows-gcc-x64",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "D:/Soferwares/Git/Git_repositories/Learning_DengFOC/dengfoc-odrive/Firmware/Board",
+        "D:/Soferwares/Git/Git_repositories/Learning_DengFOC/dengfoc-odrive/Firmware/communication",
+        "D:/Soferwares/Git/Git_repositories/Learning_DengFOC/dengfoc-odrive/Firmware/doctest",
+        "D:/Soferwares/Git/Git_repositories/Learning_DengFOC/dengfoc-odrive/Firmware/Drivers",
+        "D:/Soferwares/Git/Git_repositories/Learning_DengFOC/dengfoc-odrive/Firmware/fibre",
+        "D:/Soferwares/Git/Git_repositories/Learning_DengFOC/dengfoc-odrive/Firmware/HMI",
+        "D:/Soferwares/Git/Git_repositories/Learning_DengFOC/dengfoc-odrive/Firmware/MotorControl",
+        "D:/Soferwares/Git/Git_repositories/Learning_DengFOC/dengfoc-odrive/Firmware/Tests"
+      ],
+      "compilerPath": "D:/Soferwares/mingw64/bin/gcc.exe",
+      "cStandard": "${default}",
+      "cppStandard": "${default}",
+      "intelliSenseMode": "windows-gcc-x64",
+      "compilerArgs": [
+        ""
+      ]
+    }
+  ],
+  "version": 4
+}
