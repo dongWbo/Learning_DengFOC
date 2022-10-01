@@ -147,6 +147,7 @@ public:
             bool checks_ok = do_checks();
             // Update all estimators
             // Note: updates run even if checks fail
+            //编码器更新在这里面
             bool updates_ok = do_updates(); 
 
             // make sure the watchdog is being fed. 
@@ -161,7 +162,6 @@ public:
 
             // Run main loop function, defer quitting for after wait
             // TODO: change arming logic to arm after waiting
-            //主循环在这里
             bool main_continue = update_handler();
 
             // Check we meet deadlines after queueing

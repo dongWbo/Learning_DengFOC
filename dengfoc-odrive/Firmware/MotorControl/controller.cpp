@@ -251,12 +251,16 @@ bool Controller::update(float* torque_setpoint_output) {
     }
 
     // Velocity limiting
+    //速度控制
+
+    //速度限幅
     float vel_lim = config_.vel_limit;
     if (config_.enable_vel_limit) {
         vel_des = std::clamp(vel_des, -vel_lim, vel_lim);
     }
 
     // Check for overspeed fault (done in this module (controller) for cohesion with vel_lim)
+    //超速响应
     if (config_.enable_overspeed_error) {  // 0.0f to disable
         if (!vel_estimate_src) {
             set_error(ERROR_INVALID_ESTIMATE);
@@ -270,6 +274,7 @@ bool Controller::update(float* torque_setpoint_output) {
 
     // TODO: Change to controller working in torque units
     // Torque per amp gain scheduling (ACIM)
+    //速度PI控制系数
     float vel_gain = config_.vel_gain;
     float vel_integrator_gain = config_.vel_integrator_gain;
     if (axis_->motor_.config_.motor_type == Motor::MOTOR_TYPE_ACIM) {

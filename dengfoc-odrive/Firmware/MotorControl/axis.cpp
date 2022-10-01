@@ -345,12 +345,15 @@ bool Axis::run_closed_loop_control_loop() {
     set_step_dir_active(config_.enable_step_dir);
 
     //循环运行
+    //编码器更新在这里
     run_control_loop([this](){
         // Note that all estimators are updated in the loop prefix in run_control_loop
         float torque_setpoint;
+        //控制模式更新
         if (!controller_.update(&torque_setpoint))
             return error_ |= ERROR_CONTROLLER_FAILED, false;
 
+        //用转子机械速度 计算 电速度 
         float phase_vel = (2*M_PI) * encoder_.vel_estimate_ * motor_.config_.pole_pairs;
         if (!motor_.update(torque_setpoint, encoder_.phase_, phase_vel))
             return false; // set_error should update axis.error_
@@ -574,7 +577,7 @@ void Axis::run_state_machine_loop() {
                     goto invalid_state_label;
                 watchdog_feed();
                 
-                //运行主体部分
+                //闭环运行主体部分
                 status = run_closed_loop_control_loop();
             } break;
 

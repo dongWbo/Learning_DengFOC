@@ -8,8 +8,8 @@
       "args": [],
       "stopAtEntry": false,
       "externalConsole": true,
-      "cwd": "d:/Soferwares/Git/Git_repositories/Learning_DengFOC/dengfoc-odrive",
-      "program": "d:/Soferwares/Git/Git_repositories/Learning_DengFOC/dengfoc-odrive/build/Debug/outDebug",
+      "cwd": "d:/Soferwares/Git/Git_repositories/Learning_DengFOC/dengfoc-odrive/Firmware/MotorControl",
+      "program": "d:/Soferwares/Git/Git_repositories/Learning_DengFOC/dengfoc-odrive/Firmware/MotorControl/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [

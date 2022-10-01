@@ -334,6 +334,9 @@ bool Motor::FOC_voltage(float v_d, float v_q, float pwm_phase) {
 }
 
 bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_phase) {
+    //I_phase 当前检测到的转子的电角度
+    //pwm_phase 本次输出发挥作用时转子的电角度，提前1.5个pwm周期
+
     // Syntactic sugar
     CurrentControl_t& ictrl = current_control_;
 
@@ -341,20 +344,25 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
     ictrl.Iq_setpoint = Iq_des;
 
     // Check for current sense saturation
+    //检查是否超出电流检测量程
     if (std::abs(current_meas_.phB) > ictrl.overcurrent_trip_level || std::abs(current_meas_.phC) > ictrl.overcurrent_trip_level) {
         set_error(ERROR_CURRENT_SENSE_SATURATION);
         return false;
     }
 
     // Clarke transform
+    //基于基尔霍夫定律，用检测的两相电流，计算第三相电流
+    //静止两项坐标系转化为静止两项坐标系
     float Ialpha = -current_meas_.phB - current_meas_.phC;
     float Ibeta = one_by_sqrt3 * (current_meas_.phB - current_meas_.phC);
 
     // Park transform
+    //静止两项坐标系转化为旋转两项坐标系
     float c_I = our_arm_cos_f32(I_phase);
     float s_I = our_arm_sin_f32(I_phase);
     float Id = c_I * Ialpha + s_I * Ibeta;
     float Iq = c_I * Ibeta - s_I * Ialpha;
+    
     ictrl.Iq_measured += ictrl.I_measured_report_filter_k * (Iq - ictrl.Iq_measured);
     ictrl.Id_measured += ictrl.I_measured_report_filter_k * (Id - ictrl.Id_measured);
 
@@ -442,6 +450,7 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
 // torque_setpoint [Nm]
 // phase [rad electrical]
 // phase_vel [rad/s electrical]
+//对qd轴电流限幅，补偿了电机转子位置检测 在 1.5倍pwm周期的控制延下 对系统的负面作用 ， 根据不同的电机类型索引到不同的控制方式
 bool Motor::update(float torque_setpoint, float phase, float phase_vel) {
     //电流期望值
     float current_setpoint = 0.0f;
@@ -451,19 +460,19 @@ bool Motor::update(float torque_setpoint, float phase, float phase_vel) {
 
     //计算设置电流的大小和方向
     if (config_.motor_type == MOTOR_TYPE_ACIM) {
-        //感应电机
+        //交流感应电机
         current_setpoint = torque_setpoint / (config_.torque_constant * fmax(current_control_.acim_rotor_flux, config_.acim_gain_min_flux));
     }
     else {
         //大电流电机或云台电机
-        current_setpoint = torque_setpoint / config_.torque_constant;
+        current_setpoint = torque_setpoint / config_.torque_constant;  //  8.27 / KV
     }
     current_setpoint *= config_.direction;
 
     // TODO: 2-norm vs independent clamping (current could be sqrt(2) bigger)
     //电流限制
     float ilim = effective_current_lim();
-    //dq轴的设置电流限幅
+    //dq轴的电流限幅
     float id = std::clamp(current_control_.Id_setpoint, -ilim, ilim);
     float iq = std::clamp(current_setpoint, -ilim, ilim);
 
@@ -497,7 +506,7 @@ bool Motor::update(float torque_setpoint, float phase, float phase_vel) {
         phase += current_control_.async_phase_offset;
         phase = wrap_pm_pi(phase);
     }
-    //电流的设置值生效在1.5倍的PWM周期之后
+    //电流的设置值生效在1.5倍的PWM周期之后 ， 大电流电机使用编码器的的角度值
     float pwm_phase = phase + 1.5f * current_meas_period * phase_vel;
 
     // Execute current command
